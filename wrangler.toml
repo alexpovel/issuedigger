@@ -1,0 +1,61 @@
+name = "issuedigger"
+main = "src/index.ts"
+compatibility_date = "2024-03-04"
+logpush = true
+
+# https://developers.cloudflare.com/workers/runtime-apis/nodejs/crypto/
+compatibility_flags = ["nodejs_compat"]
+
+route = { pattern = "issuedigger.app", custom_domain = true }
+
+[vars]
+# Name at https://github.com/apps/{GITHUB_APP_SLUG}. It's referred to as `slug` in the
+# GitHub API:
+# https://docs.github.com/en/rest/apps/apps?apiVersion=2022-11-28#get-an-app
+GITHUB_APP_SLUG = "issuedigger"
+# This is public information (can just visit https://api.github.com/apps/issuedigger in a
+# browser)
+GITHUB_APP_ID = "853133"
+# When onboarding (new installations etc.), fetch this many of the most recent items. We
+# cannot fetch much, as we are rate-limited by GitHub (to 5000 req/hour:
+# https://docs.github.com/en/rest/using-the-rest-api/rate-limits-for-the-rest-api?apiVersion=2022-11-28#primary-rate-limit-for-github-app-installations).
+# If we could guarantee serial onboarding, we could fetch much more (up to the rate
+# limit). However, as we have to account for parallel onboarding, better be very
+# conservative here. Building the infrastructure to serialize onboarding is non-trivial,
+# and very hard to debug/test.
+GITHUB_ONBOARDING_LOOKBACK_LIMIT = "500"
+# Return this many results for "most similar issues"
+N_SIMILAR_ISSUES = "3"
+# Used in places for poor man's permission checks.
+GITHUB_APP_OWNER = "alexpovel"
+
+[ai]
+binding = "AI"
+
+[[kv_namespaces]]
+binding = "VECTORS"
+id = "d23061b78e2b4abc8f25943055f70f1d"
+# For potential local development:
+preview_id = "9b33f8e27d434080b7726091c877c7eb"
+
+[[vectorize]]
+binding = "VECTORIZE_INDEX"
+index_name = "issuedigger"
+
+[[queues.producers]]
+queue = "issuedigger"
+binding = "GENERAL_PURPOSE"
+
+[[queues.consumers]]
+queue = "issuedigger"
+dead_letter_queue = "issuedigger-dlq"
+# Deliver messages quickly, anything else is artificial delay:
+max_batch_timeout = 1 # seconds
+
+[[durable_objects.bindings]]
+name = "ISSUE"
+class_name = "Issue"
+
+[[migrations]]
+tag = "v1"
+new_classes = ["Issue"]
